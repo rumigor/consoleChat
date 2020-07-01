@@ -44,7 +44,6 @@ public class ChatClient {
                         System.out.println("Сервер: " + strFromServer);
                     }
                 } catch (Exception e) {
-                    System.out.println("Потеряно соединение с сервером!");
                     System.exit(0);
                 }
         });
