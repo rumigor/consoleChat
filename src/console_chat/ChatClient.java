@@ -1,5 +1,7 @@
 package console_chat;
 
+import org.w3c.dom.ls.LSOutput;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -19,19 +21,25 @@ public class ChatClient {
     public static void main(String[] args) throws IOException {
         ChatClient chat = new ChatClient();
         chat.openConnection();
-        chat.t2 = new Thread(()-> {
-            while (chat.serverIsOnline) {
-                chat.sendMessage();
-            }
-        });
-        chat.t2.start();
+        while (chat.serverIsOnline) {
+            chat.sendMessage();
+        }
+
     }
 
     public void openConnection() throws IOException {
-        socket = new Socket(SERVER_ADDR, SERVER_PORT);
-        in = new DataInputStream(socket.getInputStream());
-        out = new DataOutputStream(socket.getOutputStream());
-        serverIsOnline = true;
+        try {
+            socket = new Socket(SERVER_ADDR, SERVER_PORT);
+            in = new DataInputStream(socket.getInputStream());
+            out = new DataOutputStream(socket.getOutputStream());
+            serverIsOnline = true;
+            System.out.println("Вы успешно подключились к чату!");
+            System.out.println("--------------------------------");
+        } catch (IOException | NullPointerException e) {
+            System.out.println("Не удалось подключится к серверу");
+            openConnection();
+        }
+
         t1 = new Thread(()-> {
                 try {
                     while (!t1.isInterrupted()) {
@@ -44,7 +52,18 @@ public class ChatClient {
                         System.out.println("Сервер: " + strFromServer);
                     }
                 } catch (Exception e) {
-                    System.exit(0);
+                    System.out.println("Потеряно соединение с сервером!");
+                    serverIsOnline = false;
+                    try {
+                        socket.close();
+                        in.close();
+                        out.close();
+                        Thread.currentThread().interrupt();
+                        openConnection();
+                    } catch (IOException ioException) {
+                        ioException.printStackTrace();
+                    }
+
                 }
         });
         t1.start();
@@ -57,7 +76,6 @@ public class ChatClient {
             try {
                 if (s.equals("/end")) {
                     serverIsOnline = false;
-                    out.writeUTF(s);
                     System.out.println("Вы вышли из чата!");
                     System.exit(0);
                     return;

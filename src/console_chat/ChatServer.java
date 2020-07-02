@@ -17,16 +17,17 @@ public class ChatServer {
     DataOutputStream out = null;
     boolean clientIsOnline;
     static Scanner sc = new Scanner(System.in);
+    Thread t1;
+    Thread t2;
 
     final int PORT = 8189;
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         ChatServer chatServer = new ChatServer();
         chatServer.startServer();
-
     }
-    public void startServer() {
-
-
+    public void startServer() throws IOException {
+        if (t1 != null) t1.interrupt();
+        if (t2 != null) t2.interrupt();
         try {
             server = new ServerSocket(PORT);
             System.out.println("Ожидаем подключения клиента");
@@ -40,65 +41,85 @@ public class ChatServer {
             in = new DataInputStream(socket.getInputStream());
             out = new DataOutputStream(socket.getOutputStream());
 
-            Thread t1 = new Thread(() -> {
 
-                    if (!clientIsOnline) Thread.currentThread().interrupt();
-                    while(clientIsOnline) {
-                        sendMessage();
-                    }
 
-            });
-            t1.start();
+        t1 = new Thread(() -> {
 
-            while (true) {
-
-                String str = in.readUTF();
-
-                if(str.equals("/end")){
-                    out.writeUTF("/end");
-                    System.out.println("Клиент отключился");
-                    System.out.println("-------------------");
-                    clientIsOnline = false;
-                    socket.close();
-                    server.close();
-                    in.close();
-                    out.close();
-                    t1.interrupt();
-                    startServer();
-                }
-
-                System.out.println("Клиент: " + str);
-
+            while (!Thread.currentThread().isInterrupted()) {
+                sendMessage();
             }
 
-        } catch (IOException e) {
-            System.out.println("Завершение работы сервера...");
-            e.printStackTrace();
-        } finally {
+        });
+        t1.start();
+        t2 = new Thread(() -> {
             try {
-                in.close();
-                out.close();
-                socket.close();
-                server.close();
-                System.exit(0);
+                readMessage();
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        });
+        t2.start();
+        } catch (IOException e) {
+            System.out.println("Завершение работы сервера...");
+            socket.close();
+            server.close();
+            in.close();
+            out.close();
+            startServer();
+        }
         }
 
-    }
     public void sendMessage() {
         try {
             String s = sc.nextLine();
-            if (!equals("")) {
+            if (!Thread.currentThread().isInterrupted()) {
+            if (s.equals("/end")) {
+                socket.close();
+                server.close();
+                in.close();
+                out.close();
+                sc.close();
+                System.exit(0);
+            }
+            if (!s.equals("")) {
                 try {
                     out.writeUTF(s);
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    System.out.println("Клиент еще не подключился, повторите еще раз сообщение!");
                 }
             }
-        } catch (BufferOverflowException e){
-
+            }
+        } catch (BufferOverflowException | IndexOutOfBoundsException | IOException e){
+            return;
         }
     }
+
+    public void readMessage() throws IOException {
+            try {
+                while (true) {
+
+
+                    String str = in.readUTF();
+
+
+                    if (str.equalsIgnoreCase("/end")) {
+                        System.out.println("Клиент отключился");
+                        System.out.println("-------------------");
+                        clientIsOnline = false;
+                        socket.close();
+                        server.close();
+                        in.close();
+                        out.close();
+                    }
+                    else System.out.println("Клиент: " + str);
+
+                }
+
+            } catch (IOException e) {
+                System.out.println("Socket closed");
+            } finally {
+                startServer();
+                Thread.currentThread().interrupt();
+            }
+        }
 }
